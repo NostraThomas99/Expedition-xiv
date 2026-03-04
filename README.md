@@ -1,7 +1,6 @@
 <div align="center">
   <img src="Expedition/Images/icon.png" alt="Expedition" width="128" />
   <h1>Expedition</h1>
-  <p>An automated recipe workflow orchestrator for FFXIV — Dalamud plugin</p>
 </div>
 
 ## About
