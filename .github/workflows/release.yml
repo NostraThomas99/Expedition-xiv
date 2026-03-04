@@ -76,10 +76,14 @@ jobs:
 
           # Update obfuscar.xml paths to match actual build output
           $relativePath = [System.IO.Path]::GetRelativePath((Get-Location), $outputDir)
+          $dalamudPath = "$env:AppData\XIVLauncher\addon\Hooks\dev"
           $xml = Get-Content obfuscar.xml -Raw
           $xml = $xml -replace 'Expedition\\bin\\x64\\Release\\net10\.0-windows7\.0', $relativePath
+          # Add Dalamud as an assembly search path for obfuscar
+          $xml = $xml -replace '(<Var name="InPath")', "<AssemblySearchPath path=`"$dalamudPath`" />`n  `$1"
           Set-Content obfuscar.xml $xml
           Write-Host "Updated obfuscar.xml with path: $relativePath"
+          Write-Host "Dalamud search path: $dalamudPath"
 
           # Run obfuscation
           obfuscar.console obfuscar.xml
