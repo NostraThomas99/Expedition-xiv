@@ -47,6 +47,31 @@ jobs:
       - name: Build Release
         run: dotnet build --configuration Release --no-restore
 
+      - name: Install Obfuscar
+        run: dotnet tool install --global Obfuscar.GlobalTool
+
+      - name: Obfuscate Release build
+        shell: bash
+        run: |
+          # Find the actual output directory (TFM varies)
+          output_dir=$(find Expedition/bin/x64/Release -name "Expedition.dll" -type f | head -1 | xargs dirname)
+          if [ -z "$output_dir" ]; then
+            echo "ERROR: Could not find Expedition.dll"
+            exit 1
+          fi
+          echo "Output directory: $output_dir"
+
+          # Update obfuscar.xml paths to match actual build output
+          tfm_dir=$(basename "$output_dir")
+          sed -i "s|net10.0-windows7.0|$tfm_dir|g" obfuscar.xml
+
+          # Run obfuscation
+          obfuscar obfuscar.xml
+
+          # Replace original DLL with obfuscated version
+          cp "$output_dir/obfuscated/Expedition.dll" "$output_dir/Expedition.dll"
+          rm -rf "$output_dir/obfuscated"
+
       - name: Find latest.zip
         id: find_zip
         shell: bash

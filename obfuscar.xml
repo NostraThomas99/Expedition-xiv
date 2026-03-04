@@ -1,0 +1,28 @@
+<?xml version='1.0'?>
+<Obfuscator>
+  <!-- Paths are relative to this config file -->
+  <Var name="InPath" value="Expedition\bin\x64\Release\net10.0-windows7.0" />
+  <Var name="OutPath" value="Expedition\bin\x64\Release\net10.0-windows7.0\obfuscated" />
+
+  <Var name="RenameProperties" value="true" />
+  <Var name="RenameEvents" value="true" />
+  <Var name="RenameFields" value="true" />
+  <Var name="HidePrivateApi" value="true" />
+  <Var name="UseUnicodeNames" value="false" />
+  <Var name="OptimizeMethods" value="false" />
+  <Var name="KeepPublicApi" value="false" />
+  <Var name="HideStrings" value="true" />
+  <Var name="SuppressIldasm" value="true" />
+
+  <Module file="$(InPath)\Expedition.dll">
+    <!-- Skip types that Dalamud reflects over -->
+    <SkipType name="Expedition.Configuration" />
+    <SkipType name="Expedition.DalamudApi" />
+
+    <!-- Skip the plugin entry point (Dalamud resolves by interface) -->
+    <SkipType name="Expedition.Expedition" />
+
+    <!-- Skip Activation types that use JSON deserialization -->
+    <SkipType name="Expedition.Activation.ActivationService+ServerResponse" />
+  </Module>
+</Obfuscator>

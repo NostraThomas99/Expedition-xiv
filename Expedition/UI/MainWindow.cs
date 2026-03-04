@@ -39,6 +39,7 @@ public sealed class MainWindow
     private string activationKeyInput = string.Empty;
     private string activationError = string.Empty;
     private string activationSuccess = string.Empty;
+    private bool isValidating;
 
     // Browse tab state
     private bool browseIsDol; // false = DOH crafting, true = DOL gathering
@@ -205,7 +206,8 @@ public sealed class MainWindow
             var buttonOffsetX = (inputWidth - buttonWidth) / 2;
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + buttonOffsetX);
 
-            if (Theme.PrimaryButton("Activate", new Vector2(buttonWidth, 32)) || enterPressed)
+            ImGui.BeginDisabled(isValidating);
+            if (Theme.PrimaryButton(isValidating ? "Validating..." : "Activate", new Vector2(buttonWidth, 32)) || (enterPressed && !isValidating))
             {
                 activationError = string.Empty;
                 activationSuccess = string.Empty;
@@ -216,18 +218,25 @@ public sealed class MainWindow
                 }
                 else
                 {
-                    var result = ActivationService.Activate(activationKeyInput.Trim(), Expedition.Config);
-                    if (result.IsValid)
+                    isValidating = true;
+                    var keyToValidate = activationKeyInput.Trim();
+                    Task.Run(async () =>
                     {
-                        activationSuccess = "Plugin activated successfully!";
-                        activationKeyInput = string.Empty;
-                    }
-                    else
-                    {
-                        activationError = result.ErrorMessage;
-                    }
+                        var result = await ActivationService.ActivateAsync(keyToValidate, Expedition.Config);
+                        if (result.IsValid)
+                        {
+                            activationSuccess = "Plugin activated successfully!";
+                            activationKeyInput = string.Empty;
+                        }
+                        else
+                        {
+                            activationError = result.ErrorMessage;
+                        }
+                        isValidating = false;
+                    });
                 }
             }
+            ImGui.EndDisabled();
 
             // Error / success messages
             if (!string.IsNullOrEmpty(activationError))

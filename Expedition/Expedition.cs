@@ -48,7 +48,7 @@ public sealed class Expedition : IDalamudPlugin
     private readonly OverlayWindow overlayWindow;
 
     private DateTime lastExpirationCheck = DateTime.MinValue;
-    private DateTime lastRevocationCheck = DateTime.MinValue;
+    private DateTime lastTokenRefresh = DateTime.MinValue;
 
     public Expedition(IDalamudPluginInterface pluginInterface)
     {
@@ -207,17 +207,22 @@ public sealed class Expedition : IDalamudPlugin
             return;
         }
 
-        var result = ActivationService.Activate(key.Trim(), Config);
-        if (result.IsValid)
+        DalamudApi.ChatGui.Print("[Expedition] Validating key with server...");
+
+        Task.Run(async () =>
         {
-            DalamudApi.ChatGui.Print("[Expedition] Plugin activated successfully!");
-            if (result.Info != null && !result.Info.IsLifetime)
-                DalamudApi.ChatGui.Print($"[Expedition] Key expires: {result.Info.ExpiresAt:yyyy-MM-dd}");
-        }
-        else
-        {
-            DalamudApi.ChatGui.PrintError($"[Expedition] Activation failed: {result.ErrorMessage}");
-        }
+            var result = await ActivationService.ActivateAsync(key.Trim(), Config);
+            if (result.IsValid)
+            {
+                DalamudApi.ChatGui.Print("[Expedition] Plugin activated successfully!");
+                if (result.Info != null && !result.Info.IsLifetime)
+                    DalamudApi.ChatGui.Print($"[Expedition] Key expires: {result.Info.ExpiresAt:yyyy-MM-dd}");
+            }
+            else
+            {
+                DalamudApi.ChatGui.PrintError($"[Expedition] Activation failed: {result.ErrorMessage}");
+            }
+        });
     }
 
     private void HandleCraftCommand(string args)
@@ -278,18 +283,18 @@ public sealed class Expedition : IDalamudPlugin
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        // Periodically check activation key expiration (every 60s)
+        // Periodically check session token expiration (every 60s)
         if ((DateTime.UtcNow - lastExpirationCheck).TotalSeconds > 60)
         {
             ActivationService.CheckExpiration();
             lastExpirationCheck = DateTime.UtcNow;
         }
 
-        // Periodically re-check the revocation list (every 10 minutes)
-        if ((DateTime.UtcNow - lastRevocationCheck).TotalMinutes > 10)
+        // Periodically refresh session token with server (every 4 hours)
+        if ((DateTime.UtcNow - lastTokenRefresh).TotalHours > 4)
         {
-            ActivationService.CheckRevocationPeriodic();
-            lastRevocationCheck = DateTime.UtcNow;
+            ActivationService.RefreshToken(Config);
+            lastTokenRefresh = DateTime.UtcNow;
         }
 
         // Auto-detect plugin loads/reloads (runs even without activation so the

@@ -125,6 +125,8 @@ public sealed class Configuration : IPluginConfiguration
 
     // --- Activation ---
     public string ActivationKey { get; set; } = string.Empty;
+    public string SessionToken { get; set; } = string.Empty;
+    public string MachineId { get; set; } = string.Empty;
 
     public void Save()
     {
