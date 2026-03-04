@@ -57,55 +57,53 @@ jobs:
         run: dotnet tool install --global Obfuscar.GlobalTool
 
       - name: Obfuscate Release build
-        shell: bash
+        shell: pwsh
         run: |
           # Find the actual output directory (TFM varies)
-          output_dir=$(find Expedition/bin/x64/Release -name "Expedition.dll" -type f | head -1 | xargs dirname)
-          if [ -z "$output_dir" ]; then
-            echo "ERROR: Could not find Expedition.dll"
+          $dll = Get-ChildItem -Path Expedition/bin/x64/Release -Filter "Expedition.dll" -Recurse | Select-Object -First 1
+          if (-not $dll) {
+            Write-Error "Could not find Expedition.dll"
             exit 1
-          fi
-          echo "Output directory: $output_dir"
+          }
+          $outputDir = $dll.DirectoryName
+          Write-Host "Output directory: $outputDir"
 
           # Update obfuscar.xml paths to match actual build output
-          tfm_dir=$(basename "$output_dir")
-          sed -i "s|net10.0-windows7.0|$tfm_dir|g" obfuscar.xml
+          $relativePath = [System.IO.Path]::GetRelativePath((Get-Location), $outputDir)
+          $xml = Get-Content obfuscar.xml -Raw
+          $xml = $xml -replace 'Expedition\\bin\\x64\\Release\\net10\.0-windows7\.0', $relativePath
+          Set-Content obfuscar.xml $xml
+          Write-Host "Updated obfuscar.xml with path: $relativePath"
 
           # Run obfuscation
           obfuscar obfuscar.xml
 
           # Replace original DLL with obfuscated version
-          cp "$output_dir/obfuscated/Expedition.dll" "$output_dir/Expedition.dll"
-          rm -rf "$output_dir/obfuscated"
+          Copy-Item "$outputDir\obfuscated\Expedition.dll" "$outputDir\Expedition.dll" -Force
+          Remove-Item "$outputDir\obfuscated" -Recurse -Force
 
-      - name: Find latest.zip
+      - name: Find or create latest.zip
         id: find_zip
-        shell: bash
-        run: |
-          zip_path=$(find Expedition/bin -name "latest.zip" -type f | head -1)
-          if [ -z "$zip_path" ]; then
-            echo "latest.zip not found, creating manually..."
-            output_dir=$(find Expedition/bin/x64/Release -name "Expedition" -type d | head -1)
-            if [ -z "$output_dir" ]; then
-              echo "ERROR: Could not find Expedition output directory"
-              exit 1
-            fi
-            echo "zip_path=${output_dir}/latest.zip" >> $GITHUB_OUTPUT
-            echo "output_dir=${output_dir}" >> $GITHUB_OUTPUT
-            echo "needs_zip=true" >> $GITHUB_OUTPUT
-          else
-            echo "zip_path=${zip_path}" >> $GITHUB_OUTPUT
-            echo "needs_zip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create zip manually (fallback)
-        if: steps.find_zip.outputs.needs_zip == 'true'
         shell: pwsh
         run: |
-          $outputDir = "${{ steps.find_zip.outputs.output_dir }}"
-          $parentDir = Split-Path $outputDir -Parent
-          $files = Get-ChildItem $parentDir -File -Include *.dll,*.json -Recurse | Where-Object { $_.DirectoryName -eq $parentDir }
-          Compress-Archive -Path $files.FullName -DestinationPath "$outputDir/latest.zip" -Force
+          $zip = Get-ChildItem -Path Expedition/bin -Filter "latest.zip" -Recurse | Select-Object -First 1
+          if ($zip) {
+            Write-Host "Found latest.zip at: $($zip.FullName)"
+            "zip_path=$($zip.FullName)" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "latest.zip not found, creating manually..."
+            $dll = Get-ChildItem -Path Expedition/bin/x64/Release -Filter "Expedition.dll" -Recurse | Select-Object -First 1
+            if (-not $dll) {
+              Write-Error "Could not find Expedition.dll"
+              exit 1
+            }
+            $outputDir = $dll.DirectoryName
+            $files = Get-ChildItem $outputDir -File | Where-Object { $_.Extension -in '.dll', '.json' }
+            $zipPath = Join-Path $outputDir "latest.zip"
+            Compress-Archive -Path $files.FullName -DestinationPath $zipPath -Force
+            Write-Host "Created latest.zip at: $zipPath"
+            "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
